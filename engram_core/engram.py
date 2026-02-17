@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Callable, Optional
 
 from .schema import MemoryUnit
-from .store import EngramStore
+from .lance_store import LanceStore as EngramStore  # v0.9.1: LanceDB backend
 from .embedder import Embedder
 from .retriever import Retriever
 from .consolidator import Consolidator
@@ -55,7 +55,7 @@ class Engram:
         self.data_dir.mkdir(parents=True, exist_ok=True)
 
         # Core systems
-        self.store = EngramStore(str(self.data_dir / "store"))
+        self.store = EngramStore(str(self.data_dir / "lance_store"))
         self.embedder = Embedder(model_path=model_path)
         self.identity = Identity(str(self.data_dir / "identity"))
 

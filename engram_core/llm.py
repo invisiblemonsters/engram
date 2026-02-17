@@ -75,6 +75,8 @@ class EngramLLM:
 
         self.max_retries = max_retries
         self.timeout = timeout
+        self._last_call_ts = 0.0
+        self._rate_limit_sec = 8  # Free tier NVIDIA cooldown
 
     def _detect_backend(self):
         """Try backends in priority order, return first available."""
@@ -157,6 +159,12 @@ class EngramLLM:
         """
         Send prompt, expect JSON response. Returns parsed dict or None on failure.
         """
+        # Rate limit guard (NVIDIA free tier)
+        elapsed = time.time() - self._last_call_ts
+        if elapsed < self._rate_limit_sec:
+            time.sleep(self._rate_limit_sec - elapsed)
+        self._last_call_ts = time.time()
+
         for attempt in range(self.max_retries):
             try:
                 messages = [
