@@ -31,10 +31,10 @@ class Embedder:
             # Try sentence-transformers as middle ground
             try:
                 from sentence_transformers import SentenceTransformer
-                self.model = SentenceTransformer("all-MiniLM-L6-v2")
+                self.model = SentenceTransformer("BAAI/bge-small-en-v1.5")
                 self.dim = 384
                 self._backend = "sentence_transformers"
-                print("[ENGRAM] Embedding: sentence-transformers (all-MiniLM-L6-v2)")
+                print("[ENGRAM] Embedding: sentence-transformers (BAAI/bge-small-en-v1.5)")
             except ImportError:
                 print("[ENGRAM] Embedding: deterministic hash fallback (install sentence-transformers for better quality)")
 
