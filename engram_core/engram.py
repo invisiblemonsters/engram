@@ -16,6 +16,17 @@ from .narrative import Narrative
 from .transplant import Transplant
 from .prospective import Prospective
 from .anchoring import Anchoring
+from .llm import EngramLLM
+
+
+def _make_llm_fn(llm_client: EngramLLM):
+    """Wrap EngramLLM into the simple str->str callable expected by subsystems."""
+    def llm_fn(prompt: str) -> str:
+        result = llm_client.call_text(prompt)
+        if result is None:
+            raise RuntimeError("LLM call failed")
+        return result
+    return llm_fn
 
 
 class Engram:
@@ -32,6 +43,8 @@ class Engram:
     def __init__(self, data_dir: str = "engram_data",
                  model_path: Optional[str] = None,
                  llm_fn: Optional[Callable] = None,
+                 llm_base_url: Optional[str] = None,
+                 llm_model: Optional[str] = None,
                  agent_name: str = "Metatron",
                  max_tokens: int = 2_000_000):
         
@@ -42,6 +55,20 @@ class Engram:
         self.store = EngramStore(str(self.data_dir / "store"))
         self.embedder = Embedder(model_path=model_path)
         self.identity = Identity(str(self.data_dir / "identity"))
+
+        # LLM backend: explicit fn > auto-detect copilot-proxy
+        if llm_fn is None:
+            kwargs = {}
+            if llm_base_url:
+                kwargs["base_url"] = llm_base_url
+            if llm_model:
+                kwargs["model"] = llm_model
+            llm_client = EngramLLM(**kwargs)
+            if llm_client.is_available():
+                llm_fn = _make_llm_fn(llm_client)
+                print(f"[ENGRAM] LLM backend: {llm_model} via {llm_base_url}")
+            else:
+                print("[ENGRAM] LLM backend: not available (stubs active)")
 
         # Cognitive systems
         self.retriever = Retriever(self.store, self.embedder)
