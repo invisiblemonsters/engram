@@ -17,6 +17,7 @@ from .transplant import Transplant
 from .prospective import Prospective
 from .anchoring import Anchoring
 from .attestation import Attester
+from .safe_write import SafeWriter
 from .llm import EngramLLM
 
 
@@ -82,6 +83,7 @@ class Engram:
         self.prospective = Prospective(self.store, self.embedder, llm_fn)
         self.anchoring = Anchoring(self.store)
         self.attester = Attester(self.store, self.identity)
+        self.safe_writer = SafeWriter(str(self.data_dir))
 
         self._session_start = None
         self._wakeup_done = False
@@ -212,6 +214,9 @@ class Engram:
         
         Call before session ends (or run via cron for crash resilience).
         """
+        # Snapshot before heavy writes
+        self.safe_writer.snapshot()
+
         report = {"consolidated": 0, "dreamed": 0, "archived": 0, "narrative_updated": False}
 
         # Final consolidation

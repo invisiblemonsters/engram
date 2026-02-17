@@ -1,6 +1,7 @@
-"""ENGRAM Self-Evolution Module (v0.6)
+"""ENGRAM Self-Evolution Module (v0.9)
 Dream cycle outputs executable patches → code evolution → better memory.
-Now with test-3-times safety + automatic rollback.
+Safety: confidence >= 0.99 + 5/5 pytest passes for auto-apply.
+Transactional backup on every write path.
 Designed by Grok 4.20, implemented by Metatron.
 """
 import os
@@ -29,7 +30,7 @@ class SelfEvolver:
     def __init__(self, engram, llm_fn: Optional[Callable] = None):
         self.engram = engram
         self.llm = llm_fn
-        self.min_confidence = 0.92  # Only auto-apply above this
+        self.min_confidence = 0.99  # Only auto-apply above this (was 0.92)
         self.proposals_dir = os.path.join(engram.store.data_dir, "evolution_proposals")
         os.makedirs(self.proposals_dir, exist_ok=True)
 
@@ -130,13 +131,14 @@ class SelfEvolver:
         return True
 
     def try_auto_apply(self, patch: EvolutionPatch) -> bool:
-        """Attempt auto-application with safety gates:
-        1. Confidence >= 0.95
+        """Attempt auto-application with strict safety gates:
+        1. Confidence >= 0.99
         2. Target file inside engram/ directory
-        3. Pass 2/3 test runs (default: full pytest suite)
+        3. Pass 5/5 test runs (default: full pytest suite)
         4. Rollback on any failure
         """
-        if patch.confidence < 0.95:
+        if patch.confidence < 0.99:
+            print(f"[SAFETY] Human gate: confidence {patch.confidence} < 0.99")
             return False
         if not self._validate_target(patch):
             return False
@@ -149,13 +151,13 @@ class SelfEvolver:
 
         print(f"[ENGRAM] Auto-apply candidate: {patch.patch_type} → {patch.target_file} (conf={patch.confidence})")
 
-        # Run tests 3 times
-        successes = sum(self.test_patch(patch) for _ in range(3))
-        if successes >= 2:
-            print(f"[ENGRAM] Tests passed {successes}/3 — patch eligible")
+        # Run tests 5 times — must pass ALL 5
+        successes = sum(self.test_patch(patch) for _ in range(5))
+        if successes == 5:
+            print(f"[ENGRAM] Tests passed 5/5 — patch auto-applied")
             return True
         else:
-            print(f"[ENGRAM] Tests failed {3-successes}/3 — rollback")
+            print(f"[ENGRAM] Tests failed {5-successes}/5 — rollback")
             # Rollback
             with open(filepath, "w", encoding="utf-8") as f:
                 f.write(original)
@@ -172,7 +174,7 @@ class SelfEvolver:
             results["proposed"] += 1
 
             # Attempt auto-apply for very high confidence patches with tests
-            if patch.confidence >= 0.95 and patch.test_command:
+            if patch.confidence >= 0.99 and patch.test_command:
                 if self.try_auto_apply(patch):
                     results["auto_applied"] += 1
                     # Update proposal status
@@ -184,7 +186,7 @@ class SelfEvolver:
 
             # Record in memory
             from .schema import MemoryUnit
-            status = "auto_applied" if patch.confidence >= 0.95 and patch.test_command else "proposed"
+            status = "auto_applied" if patch.confidence >= 0.99 and patch.test_command else "proposed"
             unit = MemoryUnit(
                 content=f"Self-evolution {status}: {patch.patch_type} → {patch.target_file}\n"
                         f"Rationale: {patch.rationale}\n"

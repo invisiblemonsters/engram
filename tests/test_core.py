@@ -81,6 +81,36 @@ class TestProspective:
         assert isinstance(result, list)
 
 
+class TestSafeWrite:
+    """Test transactional backup layer."""
+
+    def test_safe_writer_init(self, engram):
+        """SafeWriter should exist on engram."""
+        assert engram.safe_writer is not None
+        assert hasattr(engram.safe_writer, 'snapshot')
+        assert hasattr(engram.safe_writer, 'rollback')
+
+    def test_snapshot_creates_backup(self, engram):
+        """Snapshot should create a backup directory."""
+        import os
+        path = engram.safe_writer.snapshot()
+        assert os.path.exists(path)
+
+
+class TestSelfEvolveSafety:
+    """Test self-evolve safety gates."""
+
+    def test_confidence_threshold(self, engram):
+        """Self-evolve should reject patches below 0.99."""
+        from engram_core.self_evolve import SelfEvolver, EvolutionPatch
+        evolver = SelfEvolver(engram)
+        patch = EvolutionPatch(
+            patch_type="test", target_file="engram_core/schema.py",
+            diff="test", confidence=0.95, rationale="test"
+        )
+        assert evolver.try_auto_apply(patch) == False
+
+
 class TestTransplant:
     """Test transplant system."""
 
