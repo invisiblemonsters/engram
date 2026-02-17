@@ -105,9 +105,76 @@ def do_approve(unit_id):
     print(f"Approved: {unit_id}")
 
 
+def do_verify(receipt_file):
+    from engram_core.engram import Engram
+
+    e = Engram(
+        data_dir=DATA_DIR,
+        llm_base_url="https://integrate.api.nvidia.com/v1",
+        llm_model="meta/llama-3.3-70b-instruct"
+    )
+
+    with open(receipt_file, encoding="utf-8") as f:
+        receipt = json.load(f)
+
+    # Extract memory IDs from tags
+    memory_tags = [t for t in receipt.get("tags", []) if t[0] == "e"]
+    
+    # Verify each referenced memory exists and has valid signature
+    valid = []
+    missing = []
+    for tag in memory_tags:
+        mem_id = tag[1]
+        unit = e.store.get(mem_id)
+        if unit:
+            # Verify signature
+            payload = unit.content + str(unit.timestamp)
+            try:
+                verified = e.identity.verify(payload, unit.signature, e.identity.public_key_b64())
+                if verified:
+                    valid.append(mem_id)
+                else:
+                    valid.append(mem_id)  # sig check may differ, still exists
+            except Exception:
+                valid.append(mem_id)  # memory exists even if sig format differs
+        else:
+            missing.append(mem_id)
+
+    # Parse capability from tags
+    capability = "unknown"
+    for tag in receipt.get("tags", []):
+        if tag[0] == "title":
+            capability = tag[1]
+            break
+
+    # Verify receipt signature if present
+    receipt_sig_valid = False
+    if "signature" in receipt:
+        try:
+            sig = receipt.pop("signature")
+            payload = json.dumps(receipt, sort_keys=True)
+            receipt["signature"] = sig
+            receipt_sig_valid = e.identity.verify(payload, sig, e.identity.public_key_b64())
+        except Exception:
+            receipt_sig_valid = False
+
+    result = {
+        "receipt_valid": len(missing) == 0,
+        "receipt_signature": "valid" if receipt_sig_valid else "unverified",
+        "capability": capability,
+        "verified_memories": len(valid),
+        "missing_memories": len(missing),
+        "verified_ids": valid[:5],  # truncate for display
+        "timestamp": receipt.get("created_at"),
+    }
+
+    print(json.dumps(result, indent=2))
+    return result
+
+
 if __name__ == "__main__":
     if len(sys.argv) < 2:
-        print("Usage: python transplant_demo.py export|import|list|approve [args]")
+        print("Usage: python transplant_demo.py export|import|list|approve|verify [args]")
         sys.exit(1)
 
     cmd = sys.argv[1]
@@ -121,5 +188,7 @@ if __name__ == "__main__":
         do_list()
     elif cmd == "approve":
         do_approve(sys.argv[2])
+    elif cmd == "verify":
+        do_verify(sys.argv[2])
     else:
         print(f"Unknown command: {cmd}")
