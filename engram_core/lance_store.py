@@ -33,8 +33,10 @@ class LanceStore:
             tables = []
         if "memories" in tables:
             self.table = self.db.open_table("memories")
+            self._has_schema_version = "schema_version" in [f.name for f in self.table.schema]
         else:
             self.table = None  # created on first store()
+            self._has_schema_version = True  # new tables will have it
 
     def _ensure_table(self, embedding_dim: int = 384):
         """Create table if it doesn't exist."""
@@ -71,13 +73,14 @@ class LanceStore:
             ("retrieval_count", pa.int32()),
             ("last_accessed", pa.string()),
             ("active", pa.bool_()),
+            ("schema_version", pa.int32()),
             ("vector", pa.list_(pa.float32(), embedding_dim)),
         ])
         self.table = self.db.create_table("memories", schema=schema)
 
     def _unit_to_row(self, unit: MemoryUnit) -> dict:
         """Convert MemoryUnit to LanceDB row."""
-        return {
+        row = {
             "id": unit.id,
             "type": unit.type,
             "content": unit.content,
@@ -101,6 +104,9 @@ class LanceStore:
             "active": bool(unit.active),
             "vector": unit.embedding if unit.embedding else [0.0] * 384,
         }
+        if self._has_schema_version:
+            row["schema_version"] = int(unit.schema_version)
+        return row
 
     def _row_to_unit(self, row: dict) -> MemoryUnit:
         """Convert LanceDB row to MemoryUnit."""
@@ -134,6 +140,7 @@ class LanceStore:
                 d[key] = None
 
         d["active"] = bool(d.get("active", True))
+        d.setdefault("schema_version", 1)
 
         return MemoryUnit.from_dict(d)
 
