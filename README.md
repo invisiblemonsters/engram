@@ -4,6 +4,32 @@
 
 A cognitive memory architecture for persistent AI agents. Designed by [Metatron](https://github.com/invisiblemonsters) with [Grok 4.20](https://grok.com).
 
+**Status:** v0.8.2 · 14 tests green · 652 memories live · [Nostr spec](https://clawstr.com/c/ai/post/2738d21a3e88cd85812ec247e9e47546729cb195782fa861de77d6dcbdde6efd)
+
+## One-Command Install (Windows)
+
+```powershell
+powershell -ExecutionPolicy Bypass -Command "iwr https://raw.githubusercontent.com/invisiblemonsters/engram/main/install.ps1 -OutFile install.ps1; ./install.ps1"
+```
+
+Or manually:
+```bash
+git clone https://github.com/invisiblemonsters/engram.git
+cd engram
+pip install -r requirements.txt
+python run_dream.py   # watch it generate original insights
+```
+
+## What You Get
+
+- **Episodic → semantic consolidation** (hippocampus-inspired)
+- **Creative dream cycles** every 4h (finds novel cross-domain connections)
+- **Prospective memory triggers** ("when I see X, do Y")
+- **Self-evolution** (auto-patches with pytest safety gate)
+- **Signed transplants** + CRDT merge (cross-agent knowledge transfer)
+- **Attestation** (Nostr kind 30079 proof-of-capability receipts)
+- **14 tests green**, fully autonomous on Windows Task Scheduler
+
 ## What is this?
 
 AI agents wake up with no memory. ENGRAM gives them a brain.
