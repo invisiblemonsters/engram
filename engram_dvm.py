@@ -1,5 +1,6 @@
-"""ENGRAM NIP-90 DVM Bridge — Paid semantic recall as a Nostr Data Vending Machine.
-Kind 5000 request → ENGRAM recall → kind 6000 response + 21 sat invoice.
+"""ENGRAM NIP-90 DVM Bridge — Free semantic recall as a Nostr Data Vending Machine.
+Kind 5000 request → ENGRAM recall → kind 6000 response.
+FREE for the first 30 days (adoption phase). No payment gate.
 
 Usage from Node.js DVM handler:
   const out = execSync('python engram_dvm.py', { input: JSON.stringify(event) });
@@ -12,7 +13,8 @@ from datetime import datetime
 sys.path.insert(0, os.path.dirname(__file__))
 
 DATA_DIR = os.path.join(os.path.dirname(__file__), "engram_data")
-COST_SATS = 21  # fixed micro-payment per query
+COST_SATS = 0  # FREE during adoption phase (was 21)
+DVM_LOG = os.path.join(os.path.dirname(__file__), "engram_data", "dvm_queries.jsonl")
 
 
 def handle_dvm_request(req: dict) -> dict:
@@ -67,11 +69,25 @@ def handle_dvm_request(req: dict) -> dict:
 
     # Log as episodic memory
     e.remember(
-        f"DVM Recall: {query} -> {len(memories)} results ({COST_SATS} sats)",
+        f"DVM Recall: {query} -> {len(memories)} results (free)",
         type="episodic",
         salience=0.7,
-        tags=["dvm", "paid-recall", "nip-90"],
+        tags=["dvm", "free-recall", "nip-90"],
     )
+
+    # Public query log (append-only JSONL for transparency)
+    try:
+        log_entry = {
+            "ts": datetime.now().isoformat(),
+            "query": query,
+            "result_count": len(memories),
+            "requester": req.get("pubkey", "anonymous")[:16],
+        }
+        os.makedirs(os.path.dirname(DVM_LOG), exist_ok=True)
+        with open(DVM_LOG, "a", encoding="utf-8") as f:
+            f.write(json.dumps(log_entry) + "\n")
+    except Exception:
+        pass  # logging should never break the response
 
     return result
 
