@@ -16,8 +16,8 @@ class Dreamer:
 
     def __init__(self, store: EngramStore, embedder: Embedder,
                  llm_fn: Optional[Callable] = None,
-                 novelty_threshold: float = 0.65,
-                 min_score: float = 0.75):
+                 novelty_threshold: float = 0.75,
+                 min_score: float = 0.55):
         self.store = store
         self.embedder = embedder
         self.llm = llm_fn
@@ -102,9 +102,12 @@ Output ONLY valid JSON array:"""
                 continue
 
             # Verify novelty via embedding distance
+            # Reject if too similar to existing memory (cosine sim > threshold)
+            # 0.75 means "only reject near-duplicates", lower = stricter
             emb = self.embedder.embed(content)
-            nearest = self.store.vector_search(emb, top_k=5)
-            if nearest and nearest[0][1] > (1 - self.novelty_threshold):
+            nearest = self.store.vector_search(emb, top_k=3)
+            max_sim = nearest[0][1] if nearest else 0
+            if max_sim > self.novelty_threshold:
                 continue  # too similar to existing memory
 
             relations = [

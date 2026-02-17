@@ -43,7 +43,7 @@ def _load_nvidia_key():
 
 BACKENDS = [
     {"name": "copilot-proxy", "url": "http://localhost:3000/v1", "model": "claude-haiku-4.5", "key": "dummy"},
-    {"name": "nvidia", "url": "https://integrate.api.nvidia.com/v1", "model": "nvidia/nemotron-3-nano-30b-a3b", "key_fn": _load_nvidia_key},
+    {"name": "nvidia", "url": "https://integrate.api.nvidia.com/v1", "model": "meta/llama-3.3-70b-instruct", "key_fn": _load_nvidia_key},
 ]
 
 
@@ -179,7 +179,15 @@ class EngramLLM:
                     resp = requests.post(self.url, json=payload, timeout=self.timeout, headers=headers)
                     resp.raise_for_status()
                     data = resp.json()
-                    content = data["choices"][0]["message"]["content"].strip()
+                    content = data["choices"][0]["message"].get("content")
+                    if content is None:
+                        content = data["choices"][0]["message"].get("reasoning_content", "")
+                    if not content:
+                        logger.warning(f"JSON call returned empty content (attempt {attempt+1})")
+                        if attempt < self.max_retries - 1:
+                            time.sleep(2 ** attempt)
+                        continue
+                    content = content.strip()
 
                 # Strip markdown code fences if present
                 if content.startswith("```"):
@@ -240,7 +248,17 @@ class EngramLLM:
                         headers["Authorization"] = f"Bearer {self.api_key}"
                     resp = requests.post(self.url, json=payload, timeout=self.timeout, headers=headers)
                     resp.raise_for_status()
-                    return resp.json()["choices"][0]["message"]["content"].strip()
+                    data = resp.json()
+                    content = data["choices"][0]["message"].get("content")
+                    if content is None:
+                        # Some models return content=null with reasoning_content or refusal
+                        content = data["choices"][0]["message"].get("reasoning_content", "")
+                    if not content:
+                        logger.warning(f"Text call returned empty content (attempt {attempt+1}): {json.dumps(data['choices'][0]['message'])[:200]}")
+                        if attempt < self.max_retries - 1:
+                            time.sleep(2 ** attempt)
+                        continue
+                    return content.strip()
             except Exception as e:
                 logger.warning(f"Text call failed (attempt {attempt+1}): {e}")
                 if attempt < self.max_retries - 1:

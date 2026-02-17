@@ -36,35 +36,24 @@ class Consolidator:
         if not episodes or not self.llm:
             return []
 
-        # Build replay buffer
-        replay = [{"id": e.id, "content": e.content, "timestamp": e.timestamp,
-                    "tags": e.tags, "salience": e.salience} for e in episodes]
+        # Build replay buffer — keep it compact for LLM context limits
+        replay = []
+        for e in episodes:
+            ts = e.timestamp if isinstance(e.timestamp, str) else str(e.timestamp)[:19]
+            # Truncate long content to prevent context overflow
+            content = e.content[:300] if len(e.content) > 300 else e.content
+            replay.append({"id": e.id, "content": content, "ts": ts,
+                           "tags": e.tags[:5], "salience": e.salience})
 
-        prompt = f"""You are a memory consolidation system. Given these episodic memories (raw experiences),
-distill them into semantic knowledge (facts, rules, lessons learned).
-
-Rules:
-- Extract durable facts, not transient details
-- Identify contradictions with existing knowledge
-- Merge related facts into single statements
-- Preserve important context and decisions
-- Output as JSON array
-
-Episodic memories:
-{json.dumps(replay, indent=2)}
-
-Output format:
-[
-  {{
-    "content": "distilled fact or rule",
-    "tags": ["relevant", "tags"],
-    "salience": 0.0-1.0,
-    "source_episodes": ["episode_id1", "episode_id2"],
-    "contradicts": null or "description of what this contradicts"
-  }}
-]
-
-Output ONLY valid JSON array:"""
+        prompt = (
+            "You are a memory consolidation system. Distill these episodic memories "
+            "into semantic knowledge (durable facts, rules, lessons). "
+            "Merge related facts. Preserve important context.\n\n"
+            "Episodes:\n" + json.dumps(replay, indent=1) + "\n\n"
+            "Output ONLY a valid JSON array:\n"
+            '[{"content": "fact", "tags": ["tag"], "salience": 0.7, '
+            '"source_episodes": ["id1"], "contradicts": null}]'
+        )
 
         try:
             result = self.llm(prompt)
