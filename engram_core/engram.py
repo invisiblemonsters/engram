@@ -16,6 +16,7 @@ from .narrative import Narrative
 from .transplant import Transplant
 from .prospective import Prospective
 from .anchoring import Anchoring
+from .attestation import Attester
 from .llm import EngramLLM
 
 
@@ -80,6 +81,7 @@ class Engram:
         self.transplant = Transplant(self.store, self.identity)
         self.prospective = Prospective(self.store, self.embedder, llm_fn)
         self.anchoring = Anchoring(self.store)
+        self.attester = Attester(self.store, self.identity)
 
         self._session_start = None
         self._wakeup_done = False
