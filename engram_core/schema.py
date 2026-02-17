@@ -46,6 +46,7 @@ class MemoryUnit:
     retrieval_count: int = 0
     last_accessed: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     active: bool = True
+    schema_version: int = 1
 
     def content_hash(self) -> str:
         """SHA-256 of content + timestamp + prev_hash for chain integrity."""
