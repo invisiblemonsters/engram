@@ -20,9 +20,10 @@ from .llm import EngramLLM
 
 
 def _make_llm_fn(llm_client: EngramLLM):
-    """Wrap EngramLLM into the simple str->str callable expected by subsystems."""
-    def llm_fn(prompt: str) -> str:
-        result = llm_client.call_text(prompt)
+    """Wrap EngramLLM into the simple str->str callable expected by subsystems.
+    Supports optional temperature kwarg for dream cycles."""
+    def llm_fn(prompt: str, temperature: float = 0.0) -> str:
+        result = llm_client.call_text(prompt, temperature=temperature)
         if result is None:
             raise RuntimeError("LLM call failed")
         return result

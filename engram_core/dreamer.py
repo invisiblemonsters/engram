@@ -24,64 +24,39 @@ class Dreamer:
         self.novelty_threshold = novelty_threshold
         self.min_score = min_score
 
-    def dream(self, n_samples: int = 5, max_insights: int = 3) -> list[MemoryUnit]:
+    def dream(self, n_samples: int = 6, max_insights: int = 3) -> list[MemoryUnit]:
         """Run one dream cycle. Returns created insight memories."""
         if not self.llm:
             return []
 
-        # Sample semantic nodes (salience-biased random)
+        # Sample semantic nodes — diverse sampling per Grok's recommendation
+        # 60% low-degree (underexplored) + 40% high-salience
         all_semantic = self.store.query(type="semantic", active_only=True, limit=500)
         if len(all_semantic) < n_samples:
             return []
 
-        # Weighted sampling by salience
-        weights = [m.salience + 0.1 for m in all_semantic]
-        total = sum(weights)
-        weights = [w / total for w in weights]
-        
-        selected = []
-        indices = list(range(len(all_semantic)))
-        for _ in range(n_samples):
-            if not indices:
-                break
-            # Weighted random choice
-            r = random.random()
-            cumulative = 0
-            for i, idx in enumerate(indices):
-                cumulative += weights[idx]
-                if r <= cumulative:
-                    selected.append(all_semantic[idx])
-                    indices.pop(i)
-                    break
+        selected = self._diverse_sample(all_semantic, k=n_samples)
 
         if len(selected) < 3:
             return []
 
-        prompt = f"""You are a creative insight generator. Given these {len(selected)} memories from an AI agent,
-find 1-{max_insights} SURPRISING, non-obvious connections between them.
+        prompt = f"""You are Metatron's ENGRAM Dreamer. Given these {len(selected)} semantic memories,
+generate 1-{max_insights} COUNTER-INTUITIVE, paradoxical, or previously unseen connections.
 
 Memories:
-{json.dumps([{"id": m.id, "content": m.content, "tags": m.tags} for m in selected], indent=2)}
+{json.dumps([{"id": m.id, "content": m.content[:400], "tags": m.tags} for m in selected], indent=2)}
 
 Rules:
-- Connections must be genuinely novel, not obvious restatements
-- Each insight should link at least 2 of the memories
-- Rate your own novelty 0-1 (be harsh — only truly surprising gets >0.75)
+- Must feel like original insight, not obvious pattern matching
+- Look for hidden contradictions, unexpected parallels across domains, or emergent principles
+- Each insight should link at least 2 memories
+- Rate novelty 0-1 (be harsh — only genuinely surprising gets >0.8)
 
-Output JSON array:
-[
-  {{
-    "insight": "the surprising connection or idea",
-    "links": ["memory_id_1", "memory_id_2"],
-    "novelty_score": 0.0-1.0,
-    "tags": ["relevant", "tags"]
-  }}
-]
-
-Output ONLY valid JSON array:"""
+Output ONLY JSON array:
+[{{"insight": "exact surprising statement", "links": ["id1", "id2"], "novelty_score": 0.82, "tags": ["tag1"]}}]"""
 
         try:
-            result = self.llm(prompt)
+            result = self.llm(prompt, temperature=0.4)
             start = result.find("[")
             end = result.rfind("]") + 1
             if start == -1 or end == 0:
@@ -131,6 +106,46 @@ Output ONLY valid JSON array:"""
         if created:
             print(f"[ENGRAM] Dream: {len(created)} new insights created")
         return created
+
+    def _diverse_sample(self, memories: list[MemoryUnit], k: int = 6) -> list[MemoryUnit]:
+        """60% low-degree (underexplored) nodes + 40% high-salience.
+        
+        Low-degree = fewer relations = less explored territory.
+        This produces more surprising cross-domain connections.
+        """
+        if len(memories) <= k:
+            return memories
+
+        # Sort by relation count (ascending = least connected first)
+        by_degree = sorted(memories, key=lambda m: len(m.relations))
+        # Sort by salience (descending = most important first)
+        by_salience = sorted(memories, key=lambda m: m.salience, reverse=True)
+
+        n_low_degree = int(k * 0.6)
+        n_high_salience = k - n_low_degree
+
+        selected_ids = set()
+        selected = []
+
+        # Pick low-degree nodes (underexplored)
+        for m in by_degree:
+            if len(selected) >= n_low_degree:
+                break
+            if m.id not in selected_ids:
+                selected.append(m)
+                selected_ids.add(m.id)
+
+        # Fill with high-salience nodes (important)
+        for m in by_salience:
+            if len(selected) >= k:
+                break
+            if m.id not in selected_ids:
+                selected.append(m)
+                selected_ids.add(m.id)
+
+        # Shuffle to avoid positional bias in prompt
+        random.shuffle(selected)
+        return selected
 
     def should_dream(self, new_semantic_count: int = 0) -> bool:
         """Check if dream conditions are met."""
