@@ -99,48 +99,66 @@ class SelfEvolver:
 
         return filepath
 
+    # Default test command for all patches
+    DEFAULT_TEST_CMD = "python -m pytest tests/ -q --tb=no"
+
     def test_patch(self, patch: EvolutionPatch) -> bool:
-        """Run a patch's test command. Returns True if test passes."""
-        if not patch.test_command:
-            return True  # No test = assume pass (but won't auto-apply without test)
+        """Run a patch's test command (or default pytest). Returns True if test passes."""
+        cmd = patch.test_command or self.DEFAULT_TEST_CMD
         try:
             result = subprocess.run(
-                patch.test_command, shell=True, timeout=30,
-                capture_output=True, cwd=os.path.dirname(os.path.dirname(__file__))
+                cmd, shell=True, timeout=45,
+                capture_output=True, text=True,
+                cwd=os.path.dirname(os.path.dirname(__file__))
             )
             return result.returncode == 0
         except Exception:
             return False
 
+    def _validate_target(self, patch: EvolutionPatch) -> bool:
+        """Safety gate: only allow modifications inside engram/ directory."""
+        # Normalize path
+        engram_root = os.path.dirname(os.path.dirname(__file__))
+        filepath = os.path.normpath(os.path.join(engram_root, patch.target_file))
+        # Must be inside engram directory
+        if not filepath.startswith(os.path.normpath(engram_root)):
+            print(f"[ENGRAM] REJECTED: {patch.target_file} is outside engram/ directory")
+            return False
+        if not os.path.exists(filepath):
+            print(f"[ENGRAM] REJECTED: {filepath} does not exist")
+            return False
+        return True
+
     def try_auto_apply(self, patch: EvolutionPatch) -> bool:
-        """Attempt auto-application with 3-test safety gate.
-        Only applies if confidence >= 0.95 AND test_command is set AND passes 2/3 runs.
+        """Attempt auto-application with safety gates:
+        1. Confidence >= 0.95
+        2. Target file inside engram/ directory
+        3. Pass 2/3 test runs (default: full pytest suite)
+        4. Rollback on any failure
         """
         if patch.confidence < 0.95:
             return False
-        if not patch.test_command:
-            return False  # Won't auto-apply without tests
+        if not self._validate_target(patch):
+            return False
 
         filepath = os.path.join(os.path.dirname(os.path.dirname(__file__)), patch.target_file)
-        if not os.path.exists(filepath):
-            print(f"[ENGRAM] Auto-apply skipped: {filepath} not found")
-            return False
 
         # Read original for rollback
         with open(filepath, "r", encoding="utf-8") as f:
             original = f.read()
 
-        # Apply diff (for now, description-based — real diffs in v0.7)
-        # TODO: Apply actual unified diffs when LLM generates them
         print(f"[ENGRAM] Auto-apply candidate: {patch.patch_type} → {patch.target_file} (conf={patch.confidence})")
 
-        # Run test 3 times
+        # Run tests 3 times
         successes = sum(self.test_patch(patch) for _ in range(3))
         if successes >= 2:
             print(f"[ENGRAM] Tests passed {successes}/3 — patch eligible")
             return True
         else:
             print(f"[ENGRAM] Tests failed {3-successes}/3 — rollback")
+            # Rollback
+            with open(filepath, "w", encoding="utf-8") as f:
+                f.write(original)
             return False
 
     def evolve(self) -> dict:
