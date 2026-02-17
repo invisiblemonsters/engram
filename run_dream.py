@@ -29,6 +29,14 @@ print(f"[DREAM] Dream cycle: {len(insights)} insights generated ({time.time()-t:
 for i, ins in enumerate(insights):
     print(f"  [{i+1}] {ins.content[:200]}...")
 
+# Run self-evolution
+print("\n[DREAM] Running self-evolution...")
+t = time.time()
+from engram_core.self_evolve import SelfEvolver
+evolver = SelfEvolver(e, e.dreamer.llm)
+evo_results = evolver.evolve()
+print(f"[DREAM] Self-evolution: {evo_results['proposed']} proposals ({time.time()-t:.1f}s)")
+
 # Final status
 s = e.status()
 print(f"\n[DREAM] Final: {s['memories']['total']} total, {s['memories']['episodic']} episodic, {s['memories']['semantic']} semantic, {s['memories']['insight']} insights")
