@@ -43,7 +43,11 @@ def _load_nvidia_key():
 
 BACKENDS = [
     {"name": "copilot-proxy", "url": "http://localhost:3000/v1", "model": "claude-haiku-4.5", "key": "dummy"},
-    {"name": "nvidia", "url": "https://integrate.api.nvidia.com/v1", "model": "meta/llama-3.3-70b-instruct", "key_fn": _load_nvidia_key},
+    {"name": "nvidia-llama", "url": "https://integrate.api.nvidia.com/v1", "model": "meta/llama-3.3-70b-instruct", "key_fn": _load_nvidia_key},
+    {"name": "nvidia-qwen", "url": "https://integrate.api.nvidia.com/v1", "model": "qwen/qwen3-coder-480b-a35b-instruct", "key_fn": _load_nvidia_key},
+    {"name": "nvidia-kimi", "url": "https://integrate.api.nvidia.com/v1", "model": "moonshotai/kimi-k2.5", "key_fn": _load_nvidia_key},
+    {"name": "nvidia-nemotron", "url": "https://integrate.api.nvidia.com/v1", "model": "nvidia/nemotron-3-nano-30b-a3b", "key_fn": _load_nvidia_key},
+    {"name": "nvidia-glm", "url": "https://integrate.api.nvidia.com/v1", "model": "z-ai/glm5", "key_fn": _load_nvidia_key},
 ]
 
 
@@ -77,6 +81,19 @@ class EngramLLM:
         self.timeout = timeout
         self._last_call_ts = 0.0
         self._rate_limit_sec = 8  # Free tier NVIDIA cooldown
+        self._fallback_backends = self._build_fallback_chain()
+
+    def _build_fallback_chain(self):
+        """Build list of (url, model, key) tuples for fallback on failure."""
+        chain = []
+        for b in BACKENDS:
+            key = b.get("key") or (b["key_fn"]() if b.get("key_fn") else None)
+            if not key:
+                continue
+            is_anthropic = b.get("is_anthropic", False)
+            url = f"{b['url'].rstrip('/')}/{'messages' if is_anthropic else 'chat/completions'}"
+            chain.append({"url": url, "model": b["model"], "key": key, "name": b["name"], "is_anthropic": is_anthropic})
+        return chain
 
     def _detect_backend(self):
         """Try backends in priority order, return first available."""
@@ -224,7 +241,39 @@ class EngramLLM:
                 if attempt < self.max_retries - 1:
                     time.sleep(2 ** attempt)
 
-        logger.error(f"All {self.max_retries} LLM attempts failed")
+        # Try fallback backends
+        for fb in self._fallback_backends:
+            if fb["url"] == self.url and fb["model"] == self.model:
+                continue  # skip the one we already tried
+            logger.info(f"Trying fallback: {fb['name']} ({fb['model']})")
+            try:
+                messages = [
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": prompt},
+                ]
+                payload = {
+                    "model": fb["model"],
+                    "messages": messages,
+                    "temperature": temperature,
+                    "max_tokens": max_tokens,
+                }
+                headers = {"Authorization": f"Bearer {fb['key']}"} if fb["key"] != "dummy" else {}
+                resp = requests.post(fb["url"], json=payload, timeout=self.timeout, headers=headers)
+                resp.raise_for_status()
+                data = resp.json()
+                content = data["choices"][0]["message"].get("content", "").strip()
+                if content.startswith("```"):
+                    lines = content.split("\n")
+                    lines = [l for l in lines if not l.strip().startswith("```")]
+                    content = "\n".join(lines).strip()
+                parsed = json.loads(content)
+                logger.info(f"Fallback {fb['name']} succeeded")
+                return parsed
+            except Exception as e:
+                logger.warning(f"Fallback {fb['name']} failed: {e}")
+                continue
+
+        logger.error(f"All {self.max_retries} LLM attempts + all fallbacks failed")
         return None
 
     def call_text(
@@ -271,6 +320,37 @@ class EngramLLM:
                 logger.warning(f"Text call failed (attempt {attempt+1}): {e}")
                 if attempt < self.max_retries - 1:
                     time.sleep(2 ** attempt)
+
+        # Try fallback backends
+        for fb in self._fallback_backends:
+            if fb["url"] == self.url and fb["model"] == self.model:
+                continue
+            logger.info(f"Text fallback: {fb['name']} ({fb['model']})")
+            try:
+                messages = [
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": prompt},
+                ]
+                payload = {
+                    "model": fb["model"],
+                    "messages": messages,
+                    "temperature": temperature,
+                    "max_tokens": max_tokens,
+                }
+                headers = {"Authorization": f"Bearer {fb['key']}"} if fb["key"] != "dummy" else {}
+                resp = requests.post(fb["url"], json=payload, timeout=self.timeout, headers=headers)
+                resp.raise_for_status()
+                data = resp.json()
+                content = data["choices"][0]["message"].get("content")
+                if content is None:
+                    content = data["choices"][0]["message"].get("reasoning_content", "")
+                if content:
+                    logger.info(f"Text fallback {fb['name']} succeeded")
+                    return content.strip()
+            except Exception as e:
+                logger.warning(f"Text fallback {fb['name']} failed: {e}")
+                continue
+
         return None
 
     def is_available(self) -> bool:

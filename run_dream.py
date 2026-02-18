@@ -40,3 +40,10 @@ print(f"[DREAM] Self-evolution: {evo_results['proposed']} proposals ({time.time(
 # Final status
 s = e.status()
 print(f"\n[DREAM] Final: {s['memories']['total']} total, {s['memories']['episodic']} episodic, {s['memories']['semantic']} semantic, {s['memories']['insight']} insights")
+
+# Regenerate MEMORY.md hot cache from ENGRAM
+print("\n[DREAM] Regenerating MEMORY.md hot cache...")
+t = time.time()
+from engram_hot_cache import generate_hot_cache
+generate_hot_cache()
+print(f"[DREAM] Hot cache updated ({time.time()-t:.1f}s)")
