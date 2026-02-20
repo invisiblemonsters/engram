@@ -53,7 +53,7 @@ class HotCache:
         all_results = []
         
         for query in self.QUERIES:
-            results = self.retriever.retrieve(query, top_k=15)
+            results = self.retriever.retrieve(query, top_k=15, update_access=False)
             for unit in results:
                 if unit.id not in seen_ids:
                     seen_ids.add(unit.id)

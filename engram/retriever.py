@@ -16,18 +16,18 @@ class Retriever:
                  type_filter: Optional[str] = None,
                  min_salience: float = 0.0,
                  emotion_query: Optional[list[float]] = None,
-                 days_window: Optional[int] = None) -> list[MemoryUnit]:
+                 days_window: Optional[int] = None,
+                 update_access: bool = True) -> list[MemoryUnit]:
         query_emb = self.embedder.embed(query)
-        candidates = self.store.vector_search(query_emb, top_k=top_k * 3,
-                                               type_filter=type_filter, min_salience=min_salience)
+        candidates = self.store.vector_search_full(query_emb, top_k=top_k * 3,
+                                                    type_filter=type_filter, min_salience=min_salience)
         if not candidates:
             return self.store.query(type=type_filter, min_salience=min_salience, limit=top_k)
 
         now = datetime.now(timezone.utc)
         scored = []
 
-        for unit_id, semantic_score in candidates:
-            unit = self.store.get(unit_id)
+        for unit, semantic_score in candidates:
             if not unit or not unit.active:
                 continue
             try:
@@ -62,6 +62,7 @@ class Retriever:
         scored.sort(key=lambda x: x[1], reverse=True)
         results = []
         for unit, score in scored[:top_k]:
-            self.store.update_access(unit.id)
+            if update_access:
+                self.store.update_access(unit.id)
             results.append(unit)
         return results

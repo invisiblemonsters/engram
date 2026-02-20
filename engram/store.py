@@ -223,6 +223,33 @@ class LanceStore:
             logging.getLogger("engram.store").warning(f"LanceDB vector search error: {e}")
             return []
 
+    def vector_search_full(self, query_embedding: list[float], top_k: int = 20,
+                           type_filter: Optional[str] = None,
+                           min_salience: float = 0.0) -> list[tuple["MemoryUnit", float]]:
+        """Vector search returning full MemoryUnits (avoids N+1 get() calls)."""
+        if self.table is None or not query_embedding:
+            return []
+
+        try:
+            q = self.table.search(query_embedding).limit(top_k).metric("cosine")
+            if type_filter:
+                q = q.where(f"type = '{type_filter}' AND active = true")
+            else:
+                q = q.where("active = true")
+
+            rows = q.to_list()
+            results = []
+            for r in rows:
+                dist = r.get("_distance", 1.0)
+                sim = 1.0 - dist
+                unit = self._row_to_unit(r)
+                results.append((unit, sim))
+            return results
+        except Exception as e:
+            import logging
+            logging.getLogger("engram.store").warning(f"LanceDB vector search full error: {e}")
+            return []
+
     def update_access(self, unit_id: str):
         unit = self.get(unit_id)
         if unit:
