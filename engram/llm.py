@@ -121,9 +121,15 @@ class EngramLLM:
         resp = requests.post(url, json=payload, timeout=self.timeout, headers=headers)
         resp.raise_for_status()
         data = resp.json()
-        content = data["choices"][0]["message"].get("content")
-        if content is None:
-            content = data["choices"][0]["message"].get("reasoning_content", "")
+        msg = data["choices"][0]["message"]
+        content = msg.get("content")
+        if not content:
+            # MiniMax via Ollama puts thinking in 'reasoning' field
+            content = msg.get("reasoning_content") or msg.get("reasoning") or ""
+            # Strip "done thinking" preamble if present
+            if content and "done thinking" in content[:200].lower():
+                idx = content.lower().find("done thinking")
+                content = content[idx + len("done thinking"):].lstrip(" \n.:")
         return content.strip() if content else None
 
     def _call_anthropic(self, prompt, system, temperature, max_tokens, model):

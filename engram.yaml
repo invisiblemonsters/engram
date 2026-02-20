@@ -1,0 +1,12 @@
+data_dir: ./engram_data
+embedding_provider: sentence-transformers
+embedding_model: BAAI/bge-small-en-v1.5
+llm_provider: openai
+llm_model: minimax-m2.5:cloud
+llm_api_key: dummy
+llm_base_url: http://localhost:11434/v1
+agent_name: Metatron
+max_tokens: 2000000
+hot_cache_path: C:\Users\power\clawd\MEMORY.md
+decay_half_life_days: 14
+supersede_threshold: 0.82
