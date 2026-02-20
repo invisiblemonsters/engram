@@ -138,9 +138,21 @@ class Engram:
 
     def remember(self, content: str, type: str = "episodic",
                  tags: list = None, salience: float = 0.5,
-                 emotion: Optional[list[float]] = None) -> MemoryUnit:
-        """Store a new memory."""
+                 emotion: Optional[list[float]] = None,
+                 dedup: bool = True,
+                 dedup_threshold: float = 0.95) -> Optional[MemoryUnit]:
+        """Store a new memory. Returns None if dedup detects a near-duplicate."""
         embedding = self.embedder.embed(content)
+
+        # Content dedup: skip if near-identical memory already exists
+        if dedup:
+            existing = self.store.vector_search_full(embedding, top_k=1)
+            if existing:
+                unit_match, sim = existing[0]
+                if sim >= dedup_threshold and unit_match.active:
+                    logger.debug(f"Dedup: skipping (sim={sim:.3f}) — already have: {unit_match.content[:60]}")
+                    return None
+
         prev_hash = self.store.get_last_hash()
 
         unit = MemoryUnit(
