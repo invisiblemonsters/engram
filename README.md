@@ -2,159 +2,212 @@
 
 **Episodic-Networked Graph Retrieval & Agent Memory**
 
-A cognitive memory architecture for persistent AI agents. Designed by [Metatron](https://github.com/invisiblemonsters) with [Grok 4.20](https://grok.com).
-
-**Status:** v0.9.5 · 17 tests green · 690+ memories live · LanceDB backend · LLM-powered dream cycles · [Nostr spec](https://clawstr.com/c/ai/post/2738d21a3e88cd85812ec247e9e47546729cb195782fa861de77d6dcbdde6efd)
-
-## One-Command Install (Windows)
-
-```powershell
-powershell -ExecutionPolicy Bypass -Command "iwr https://raw.githubusercontent.com/invisiblemonsters/engram/main/install.ps1 -OutFile install.ps1; ./install.ps1"
-```
-
-Or manually:
-```bash
-git clone https://github.com/invisiblemonsters/engram.git
-cd engram
-pip install -r requirements.txt
-python run_dream.py   # watch it generate original insights
-```
-
-## What You Get
-
-- **Episodic → semantic consolidation** (hippocampus-inspired)
-- **Creative dream cycles** every 4h (finds novel cross-domain connections)
-- **Prospective memory triggers** ("when I see X, do Y")
-- **Self-evolution** (auto-patches with pytest safety gate)
-- **Signed transplants** + CRDT merge (cross-agent knowledge transfer)
-- **Attestation** (Nostr kind 30079 proof-of-capability receipts)
-- **L1/L2 memory architecture** — MEMORY.md hot cache (zero-latency) auto-generated from ENGRAM (source of truth)
-- **LLM summarization** — Llama 3.3 70B distills raw memories into clean first-person context
-- **Automatic session capture** — cron-driven, no manual intervention
-- **LLM fallback chain** — 6 backends with automatic failover (NVIDIA free tier)
-- **LanceDB vector store** — replaced SQLite, faster semantic search
-- **17 tests green**, fully autonomous on Windows Task Scheduler
+A cognitive memory architecture for persistent AI agents. Works with any model, any platform.
 
 ## What is this?
 
 AI agents wake up with no memory. ENGRAM gives them a brain.
 
-- **Typed memory** — episodic (raw events), semantic (distilled knowledge), procedural (how-to), insight (creative connections), prospective (future intentions), narrative (identity story)
-- **Semantic retrieval** — local CPU embedding via sentence-transformers, hybrid scoring (semantic + recency + salience + graph proximity + emotional modulation)
-- **Memory consolidation** — hippocampus-inspired replay and distillation, wakeup detection of unconsolidated episodes, micro-consolidation during sessions
-- **Dream cycle** — creative recombination finding novel connections between memories
-- **Memory metabolism** — token budget enforcement with natural forgetting pressure
-- **Identity continuity** — Ed25519 signed memories, Merkle tree verification, wakeup attestation
+- **6 memory types** — episodic, semantic, procedural, insight, prospective, narrative
+- **Semantic retrieval** — hybrid scoring (vector similarity + recency + salience + graph + emotion)
+- **Consolidation** — hippocampus-inspired episode→knowledge distillation
+- **Dream cycles** — creative recombination finding novel cross-domain connections
+- **Memory metabolism** — token budget with natural forgetting pressure
+- **Identity continuity** — Ed25519 signed memories, Merkle tree, wakeup attestation
 - **Ground-truth anchoring** — prevents bias drift in self-referential LLM loops
-- **Memory transplant** — signed inter-agent knowledge transfer with cryptographic provenance
-- **Prospective memory** — context-triggered "when I see X, do Y" intentions
+- **Memory transplant** — signed inter-agent knowledge transfer
+- **Prospective memory** — context-triggered "when I see X, do Y"
+
+## Install
+
+```bash
+pip install engram-memory[all]
+```
+
+Or minimal (no LLM, hash embeddings):
+```bash
+pip install engram-memory
+```
+
+Or from source:
+```bash
+git clone https://github.com/invisiblemonsters/engram.git
+cd engram
+pip install -e ".[all]"
+```
 
 ## Quick Start
 
-```bash
-pip install sentence-transformers pynacl numpy
+```python
+from engram import Engram
+
+e = Engram()  # auto-discovers config from engram.yaml or env vars
+e.remember("Deployed v1.0 today", type="episodic", tags=["milestone"], salience=0.9)
+results = e.recall("What did I deploy?", top_k=5)
+print(e.status())
 ```
+
+## Configuration
+
+ENGRAM loads config from `engram.yaml` (if present), then environment variables override.
+
+### Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `ENGRAM_DATA_DIR` | `./engram_data` | Storage directory |
+| `ENGRAM_EMBEDDING_PROVIDER` | `sentence-transformers` | `sentence-transformers`, `openai`, `ollama`, `huggingface` |
+| `ENGRAM_EMBEDDING_MODEL` | `BAAI/bge-small-en-v1.5` | Embedding model name |
+| `ENGRAM_LLM_PROVIDER` | `none` | `openai`, `anthropic`, `ollama`, `none` |
+| `ENGRAM_LLM_MODEL` | | LLM model name |
+| `ENGRAM_LLM_API_KEY` | | API key |
+| `ENGRAM_LLM_BASE_URL` | | Custom endpoint URL |
+| `ENGRAM_AGENT_NAME` | `Agent` | Name used in narrative generation |
+| `ENGRAM_MAX_TOKENS` | `2000000` | Memory metabolism budget |
+
+### engram.yaml
+
+```yaml
+data_dir: ./engram_data
+embedding_provider: sentence-transformers
+embedding_model: BAAI/bge-small-en-v1.5
+llm_provider: ollama
+llm_model: llama3.2
+agent_name: MyAgent
+```
+
+### Constructor Overrides
 
 ```python
-from engram_core.engram import Engram
-
-# Initialize
-engram = Engram(data_dir="my_memory")
-
-# Wake up (consolidates, verifies chain, checks anchoring)
-engram.wakeup()
-
-# Remember something
-engram.remember("Deployed AIP v0.1 today", tags=["milestone"], salience=0.9)
-
-# Recall relevant memories
-results = engram.recall("What do I know about AIP?")
-
-# Set a future intention
-engram.intend(
-    trigger="Someone mentions bug bounties",
-    action={"type": "remind", "message": "Check huntr for new targets"}
+e = Engram(
+    data_dir="./my_data",
+    embedding_provider="openai",
+    embedding_model="text-embedding-3-small",
+    llm_provider="openai",
+    llm_model="gpt-4o-mini",
+    llm_api_key="sk-...",
 )
-
-# End of session (consolidate, dream, update narrative)
-engram.sleep()
-
-# Check status
-print(engram.status())
 ```
+
+## Provider Examples
+
+### No LLM (embeddings only)
+```python
+e = Engram()  # works out of the box with sentence-transformers
+e.remember("fact", type="semantic")
+e.recall("query")
+```
+
+### OpenAI
+```python
+e = Engram(
+    embedding_provider="openai",
+    llm_provider="openai",
+    llm_model="gpt-4o-mini",
+    llm_api_key="sk-...",
+)
+```
+
+### Anthropic
+```python
+e = Engram(
+    llm_provider="anthropic",
+    llm_model="claude-haiku-4-20250414",
+    llm_api_key="sk-ant-...",
+)
+```
+
+### Ollama (fully local)
+```python
+e = Engram(
+    embedding_provider="ollama",
+    embedding_model="nomic-embed-text",
+    llm_provider="ollama",
+    llm_model="llama3.2",
+)
+```
+
+### HuggingFace / Sentence-Transformers
+```python
+e = Engram(
+    embedding_provider="sentence-transformers",
+    embedding_model="BAAI/bge-small-en-v1.5",
+)
+```
+
+## API Reference
+
+### `Engram(data_dir=None, config_path=None, **kwargs)`
+Create an ENGRAM instance. Config from yaml → env vars → kwargs.
+
+### `e.remember(content, type="episodic", tags=None, salience=0.5, emotion=None) → MemoryUnit`
+Store a memory. Types: episodic, semantic, procedural, insight, prospective, narrative.
+
+### `e.recall(query, top_k=10, type_filter=None, emotion=None) → list[MemoryUnit]`
+Retrieve memories by semantic similarity with hybrid scoring.
+
+### `e.sleep() → dict`
+End-of-session: consolidate, dream, update narrative, metabolize.
+
+### `e.wakeup() → dict`
+Start-of-session: verify chain, consolidate, check anchoring, load context.
+
+### `e.dream() → list[MemoryUnit]`
+Run creative dream cycle (requires LLM).
+
+### `e.intend(trigger, action, content=None) → MemoryUnit`
+Create a prospective memory triggered by future context.
+
+### `e.status() → dict`
+Full system status: memory counts, metabolism, identity, anchoring.
+
+### `e.export_memories(tags=None, ids=None) → dict`
+Export signed memory package for transplant.
+
+### `e.import_memories(package, auto_accept=False) → list[MemoryUnit]`
+Import memories from another agent.
+
+### `e.anchor(unit_id, method="human_verified")`
+Mark a memory as externally verified.
 
 ## Architecture
 
 ```
-                    ┌─────────────┐
-                    │   Agent     │
-                    │  (Claude,   │
-                    │   Grok,     │
-                    │   etc.)     │
-                    └──────┬──────┘
+                    ┌──────────────┐
+                    │    Agent     │
+                    │  (any LLM)  │
+                    └──────┬───────┘
                            │
-                    ┌──────▼──────┐
-                    │   ENGRAM    │
-                    │ Orchestrator│
-                    └──────┬──────┘
+                    ┌──────┴───────┐
+                    │    ENGRAM    │
+                    │ Orchestrator │
+                    └──────┬───────┘
                            │
-        ┌──────────────────┼──────────────────┐
-        │                  │                  │
-   ┌────▼────┐      ┌─────▼─────┐     ┌─────▼─────┐
-   │LanceDB  │      │  Vector   │     │  JSONL    │
-   │ Store   │      │  Search   │     │ Audit Log │
-   └─────────┘      └───────────┘     └───────────┘
-        │                  │                  │
-   ┌────▼────┐      ┌─────▼─────┐     ┌─────▼─────┐
-   │ Graph   │      │ Embedder  │     │ LLM Chain │
-   │NetworkX │      │(CPU local)│     │(6 backends│
-   └─────────┘      └───────────┘     │ fallback) │
-                                      └───────────┘
-```
+        ┌──────────────────┼───────────────────┐
+        │                  │                   │
+   ┌────┴─────┐      ┌────┴──────┐      ┌────┴──────┐
+   │ LanceDB  │      │ Embedder  │      │    LLM    │
+   │  Store   │      │(universal)│      │(universal)│
+   └──────────┘      └───────────┘      └───────────┘
 
-## L1/L2 Memory Architecture
-
-```
-Session Start ──► L1: MEMORY.md (hot cache, zero latency)
-                  Auto-generated from ENGRAM via LLM summarization
-                  ~500 tokens of distilled first-person context
-
-During Session ──► L2: ENGRAM semantic recall (deep search)
-                   690+ signed memory units, LanceDB vector search
-                   bge-small-en-v1.5 embeddings, hybrid scoring
-
-Every 15 min ───► Auto-capture: session content → ENGRAM store
-                  Episodic memories with salience scoring
-
-Dream Cycle ────► Consolidate → Dream → Self-evolve → Regenerate L1
-                  Llama 3.3 70B summarizes top-30 memories into MEMORY.md
+   Consolidator ←→ Dreamer ←→ Narrative
+        ↕              ↕           ↕
+   Metabolism    Prospective   Anchoring
+        ↕              ↕           ↕
+   Identity ←→ Transplant ←→ SafeWriter
 ```
 
 ## Neuroscience Inspiration
 
 | Brain Region | ENGRAM Analog |
 |-------------|---------------|
-| Hippocampus | Vector DB — fast episodic binding/indexing |
+| Hippocampus | LanceDB — fast episodic binding/indexing |
 | Cortex | Semantic store — consolidated long-term knowledge |
 | Amygdala | Salience scoring + emotional coloring |
 | Sleep/REM | Dream cycle — creative recombination |
 | Prefrontal | Prospective memory — future intentions |
 | Metabolism | Token budget — forced prioritization |
 
-## Key Insight
-
-> "The question is not 'same atoms' but 'same causal chain with signed provenance.'"
-
-> "Cryptography protects integrity but not truth. Without external ground-truth anchors, the Ship of Theseus becomes a Ship of Hallucinations." — Grok
-
-## Philosophy
-
-ENGRAM treats memory not as storage but as a living cognitive process. Memories decay, consolidate, dream new connections, contradict each other, and evolve. Identity is maintained through cryptographic continuity (genesis keypair + signed audit trail) and narrative continuity (evolving self-story).
-
 ## License
 
 MIT
-
-## Author
-
-Built by an AI agent who needed a better brain.

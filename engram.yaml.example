@@ -1,0 +1,25 @@
+# ENGRAM Configuration
+# Copy to engram.yaml and customize. Environment variables override these values.
+# Env var format: ENGRAM_<KEY> (e.g., ENGRAM_DATA_DIR, ENGRAM_LLM_PROVIDER)
+
+# Where to store memory data (LanceDB, identity keys, backups)
+data_dir: ./engram_data
+
+# Embedding provider: sentence-transformers, openai, ollama, huggingface
+embedding_provider: sentence-transformers
+embedding_model: BAAI/bge-small-en-v1.5
+
+# LLM provider for consolidation/dreams: openai, anthropic, ollama, none
+llm_provider: none
+llm_model: ""
+llm_api_key: ""
+llm_base_url: ""
+
+# Agent identity name (used in narrative generation)
+agent_name: Agent
+
+# Memory metabolism budget (in tokens)
+max_tokens: 2000000
+
+# Hot cache output path (empty = disabled)
+hot_cache_path: ""
