@@ -7,7 +7,7 @@ sys.stderr = open(os.devnull, 'w')
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace', line_buffering=True)
 
 print("Loading ENGRAM...")
-from engram_core.engram import Engram
+from engram import Engram
 import re
 
 CHUNK_SIZE = 1500

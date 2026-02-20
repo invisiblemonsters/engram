@@ -7,7 +7,7 @@ import os
 
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
-from engram_core.engram import Engram
+from engram import Engram
 
 def capture(content: str):
     e = Engram(data_dir="engram_data")

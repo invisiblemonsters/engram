@@ -16,8 +16,8 @@ from datetime import datetime
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 sys.stdout.reconfigure(encoding='utf-8', errors='replace')
 
-from engram_core.engram import Engram
-from engram_core.llm import EngramLLM
+from engram import Engram
+from engram.llm import EngramLLM
 
 MEMORY_MD_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "MEMORY.md")
 
