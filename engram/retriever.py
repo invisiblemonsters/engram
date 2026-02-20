@@ -40,11 +40,15 @@ class Retriever:
             if days_window and age_days > days_window:
                 continue
 
+            decayed_salience = unit.salience * (unit.decay_rate ** age_days)
+            if decayed_salience < 0.01:
+                continue
+
             recency = math.exp(-age_days / 14)
             graph_score = min(len(unit.relations) / 10, 1.0) if unit.relations else 0
             score = (self.WEIGHTS["semantic"] * max(semantic_score, 0) +
                      self.WEIGHTS["recency"] * recency +
-                     self.WEIGHTS["salience"] * unit.salience +
+                     self.WEIGHTS["salience"] * decayed_salience +
                      self.WEIGHTS["graph"] * graph_score)
 
             if emotion_query and unit.emotion_vector:
@@ -53,10 +57,6 @@ class Retriever:
                     score *= 1.4
                 elif resonance < -0.3:
                     score *= 0.6
-
-            decayed_salience = unit.salience * (unit.decay_rate ** age_days)
-            if decayed_salience < 0.01:
-                continue
             scored.append((unit, score))
 
         scored.sort(key=lambda x: x[1], reverse=True)

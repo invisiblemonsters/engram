@@ -19,6 +19,7 @@ from .prospective import Prospective
 from .anchoring import Anchoring
 from .safe_write import SafeWriter
 from .llm import EngramLLM
+from .hot_cache import HotCache
 
 logger = logging.getLogger("engram")
 
@@ -89,6 +90,7 @@ class Engram:
         self.prospective = Prospective(self.store, self.embedder, llm_fn)
         self.anchoring = Anchoring(self.store)
         self.safe_writer = SafeWriter(str(self.data_dir))
+        self.hot_cache = HotCache(self.store, self.embedder, self.retriever, llm_fn, self.config.agent_name)
 
         self._session_start = None
         self._wakeup_done = False
@@ -151,7 +153,37 @@ class Engram:
         self.store.store(unit)
         self.consolidator.on_new_memory(unit)
         self.metabolism.earn(0.5)
+        self._check_supersedes(unit)
         return unit
+
+    def _check_supersedes(self, new_unit: MemoryUnit, threshold: float = 0.82):
+        """Auto-detect if new memory supersedes an existing one."""
+        candidates = self.store.vector_search(new_unit.embedding, top_k=5)
+        for uid, sim in candidates:
+            if uid == new_unit.id:
+                continue
+            if sim > threshold:
+                old = self.store.get(uid)
+                if old and old.active and old.type in ("episodic", "semantic"):
+                    old.salience *= 0.3
+                    old.decay_rate = 0.8
+                    if not old.relations:
+                        old.relations = []
+                    old.relations.append({
+                        "target_id": new_unit.id,
+                        "relation": "superseded_by",
+                        "strength": sim
+                    })
+                    self.store.update_unit(old)
+
+                    if not new_unit.relations:
+                        new_unit.relations = []
+                    new_unit.relations.append({
+                        "target_id": uid,
+                        "relation": "supersedes",
+                        "strength": sim
+                    })
+                    self.store.update_unit(new_unit)
 
     def recall(self, query: str, top_k: int = 10,
                type_filter: Optional[str] = None,
@@ -201,6 +233,11 @@ class Engram:
     def import_memories(self, package: dict, auto_accept: bool = False) -> list[MemoryUnit]:
         return self.transplant.import_package(package, auto_accept=auto_accept)
 
+    def generate_hot_cache(self, output_path: Optional[str] = None, max_memories: int = 60) -> str:
+        """Generate a decay-aware hot cache summary."""
+        path = output_path or self.config.hot_cache_path or None
+        return self.hot_cache.generate(output_path=path, max_memories=max_memories)
+
     def anchor(self, unit_id: str, method: str = "human_verified"):
         self.anchoring.anchor(unit_id, method)
 
@@ -217,6 +254,7 @@ class Engram:
             "metabolism": self.metabolism.status(),
             "identity": self.identity.public_key_b64(),
             "anchoring": self.anchoring.audit_report(),
+            "hot_cache_queries": len(HotCache.QUERIES),
             "embedder": self.embedder.backend,
             "wakeup_done": self._wakeup_done,
         }

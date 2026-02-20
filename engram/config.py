@@ -20,6 +20,9 @@ _DEFAULTS = {
     "agent_name": "Agent",
     "max_tokens": 2_000_000,
     "hot_cache_path": "",
+    "decay_half_life_days": 14,
+    "supersede_threshold": 0.82,
+    "hot_cache_queries": 7,
 }
 
 _ENV_MAP = {
@@ -33,6 +36,8 @@ _ENV_MAP = {
     "ENGRAM_AGENT_NAME": "agent_name",
     "ENGRAM_MAX_TOKENS": "max_tokens",
     "ENGRAM_HOT_CACHE_PATH": "hot_cache_path",
+    "ENGRAM_DECAY_HALF_LIFE_DAYS": "decay_half_life_days",
+    "ENGRAM_SUPERSEDE_THRESHOLD": "supersede_threshold",
 }
 
 
@@ -61,8 +66,10 @@ class EngramConfig:
         for env_key, cfg_key in _ENV_MAP.items():
             val = os.environ.get(env_key)
             if val is not None:
-                if cfg_key == "max_tokens":
+                if cfg_key == "max_tokens" or cfg_key == "decay_half_life_days":
                     self._cfg[cfg_key] = int(val)
+                elif cfg_key == "supersede_threshold":
+                    self._cfg[cfg_key] = float(val)
                 else:
                     self._cfg[cfg_key] = val
 
@@ -106,6 +113,18 @@ class EngramConfig:
     @property
     def max_tokens(self) -> int:
         return int(self._cfg["max_tokens"])
+
+    @property
+    def decay_half_life_days(self) -> int:
+        return int(self._cfg["decay_half_life_days"])
+
+    @property
+    def supersede_threshold(self) -> float:
+        return float(self._cfg["supersede_threshold"])
+
+    @property
+    def hot_cache_queries(self) -> int:
+        return int(self._cfg["hot_cache_queries"])
 
     @property
     def hot_cache_path(self) -> str:
