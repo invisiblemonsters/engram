@@ -26,13 +26,25 @@ def generate_hot_cache(max_tokens: int = 8000, output_path: str = MEMORY_MD_PATH
     print(f"[hot-cache] Initializing ENGRAM...")
     e = Engram(data_dir="engram_data")
 
-    # Single broad query to minimize embedding calls
-    print(f"[hot-cache] Recalling top 30 memories...")
-    results = e.recall(
-        "Metatron identity goals projects wallets tools recent events lessons insights",
-        top_k=30
-    )
-    print(f"[hot-cache] Got {len(results)} memories")
+    # Multiple focused queries for better coverage
+    queries = [
+        ("identity wallets accounts credentials", 8),
+        ("bug bounty reports huntr hackerone submissions pipeline", 10),
+        ("PicoClaw fleet workers instances configuration", 6),
+        ("recent lessons learned mistakes insights", 6),
+        ("active projects goals priorities current work", 8),
+        ("Dim Lantern Press DLP tweets posting", 4),
+        ("COFFINHEAD preferences decisions instructions", 4),
+    ]
+    seen_ids = set()
+    results = []
+    for query, k in queries:
+        print(f"[hot-cache] Recalling: {query[:40]}... (top {k})")
+        for m in e.recall(query, top_k=k):
+            if m.id not in seen_ids:
+                seen_ids.add(m.id)
+                results.append(m)
+    print(f"[hot-cache] Got {len(results)} unique memories from {len(queries)} queries")
 
     # Build raw content for LLM summarization
     raw_memories = []

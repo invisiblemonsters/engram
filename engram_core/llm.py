@@ -42,6 +42,7 @@ def _load_nvidia_key():
     return os.environ.get("NVIDIA_API_KEY")
 
 BACKENDS = [
+    {"name": "minimax-proxy", "url": "http://localhost:11435/v1", "model": "minimax-m2.5:cloud", "key": "dummy"},
     {"name": "copilot-proxy", "url": "http://localhost:3000/v1", "model": "claude-haiku-4.5", "key": "dummy"},
     {"name": "nvidia-llama", "url": "https://integrate.api.nvidia.com/v1", "model": "meta/llama-3.3-70b-instruct", "key_fn": _load_nvidia_key},
     {"name": "nvidia-qwen", "url": "https://integrate.api.nvidia.com/v1", "model": "qwen/qwen3-coder-480b-a35b-instruct", "key_fn": _load_nvidia_key},
