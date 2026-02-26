@@ -170,7 +170,80 @@ Import memories from another agent.
 ### `e.anchor(unit_id, method="human_verified")`
 Mark a memory as externally verified.
 
-## Architecture
+## Production Memory Architecture
+
+ENGRAM was built because my agent kept losing context between sessions. The library itself is one layer of a larger system. Here's the full stack running in production — an AI agent with 26+ days of continuous memory across hundreds of sessions.
+
+### The 7-Layer Memory Stack
+
+```
+Layer 7: Heartbeats & Maintenance (cron)
+   │  Periodic fact extraction, weekly synthesis, stale session detection
+   │
+Layer 6: Semantic Search (memory_search)
+   │  Vector search across all markdown files in workspace
+   │  NVIDIA cloud embeddings, returns ranked snippets with source paths
+   │
+Layer 5: ENGRAM (this library)
+   │  SQLite + vector embeddings, 6 memory types
+   │  Decay-aware retrieval, dream cycles, hot cache generation
+   │  Periodically rebuilds a "hot cache" summary of top-scored memories
+   │
+Layer 4: Knowledge Graph (entity folders)
+   │  life/areas/{people,companies,projects}/
+   │  Each entity: summary.md + items.json (atomic facts)
+   │  Facts never deleted — marked superseded with pointer to replacement
+   │
+Layer 3: Daily Notes (memory/daily/)
+   │  Raw daily logs, written continuously during work
+   │  Episodic memory — "what happened when"
+   │
+Layer 2: Session Continuity (SESSION.md)
+   │  Live scratchpad, updated every 4-5 tool calls
+   │  Survives context compaction — insurance against detail loss
+   │
+Layer 1: Workspace Files (always loaded)
+      AGENTS.md, SOUL.md, USER.md, TOOLS.md, MEMORY.md
+      Injected into system prompt every session — "working memory"
+```
+
+### How It Actually Works
+
+**Session start:** The agent platform loads Layer 1 files into the system prompt. The agent reads daily notes and SESSION.md for recent context. ENGRAM's hot cache (MEMORY.md) provides a decay-scored summary of the most important long-term memories.
+
+**During work:** The agent writes to SESSION.md aggressively — current task, key decisions, remaining steps. Daily notes accumulate. Durable facts get extracted into the knowledge graph.
+
+**Context compaction:** When conversations get too long, the platform compresses them into a summary. SESSION.md is the insurance policy — it preserves detail that summaries lose.
+
+**Between sessions:** Heartbeat cron jobs run light maintenance. Weekly synthesis rewrites entity summaries, archives old dailies. ENGRAM's dream cycles find cross-domain connections.
+
+**The key insight:** No single memory system is enough. You need layered redundancy — fast working memory (files in system prompt), medium-term continuity (session notes), long-term recall (vector search + knowledge graph), and a maintenance loop keeping it all fresh.
+
+### Why Files Beat Databases (For Agent Memory)
+
+Most of the stack is just markdown files. This is deliberate:
+
+- **Debuggable** — you can read them, grep them, edit them by hand
+- **Portable** — git push and your agent's entire memory moves with it
+- **Inspectable** — no opaque embeddings-only stores where you can't see what the agent "knows"
+- **Resilient** — if the database corrupts, the files are still there
+- **Composable** — any tool that reads files can access the memory
+
+ENGRAM adds the vector search, decay scoring, and dream cycles on top. The files are the foundation.
+
+### Running This Stack
+
+ENGRAM handles Layer 5. For the full stack, you need:
+
+1. A workspace directory with the markdown files described above
+2. An agent platform that injects workspace files into prompts ([OpenClaw](https://github.com/openclaw/openclaw), or similar)
+3. ENGRAM for cognitive memory + hot cache generation
+4. A cron/heartbeat system for maintenance
+5. Discipline: **write it down immediately, never "mental note" anything**
+
+Rule #5 is the most important. Files survive session boundaries. Thoughts don't.
+
+## Architecture (Internal)
 
 ```
                     ┌──────────────┐
